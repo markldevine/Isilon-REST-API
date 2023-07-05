@@ -1,1 +1,1 @@
-# Isilon-REST-API-Inventory
+# Isilon-REST-API
