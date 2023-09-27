@@ -7,6 +7,63 @@ use Cro::Uri;
 
 use Data::Dump::Tree;
 
+#   my @redis-servers;
+#   if "$*HOME/.redis-servers".IO.f {
+#       @redis-servers = slurp("$*HOME/.redis-servers").chomp.split("\n");
+#   }
+#   else {
+#       die 'Unable to initialized without ~/.redis-servers';
+#   }
+#   my @redis-clis;
+#   for @redis-servers -> $redis-server {
+#       my @cmd-string = sprintf("ssh -L 127.0.0.1:6379:%s:6379 %s /usr/bin/redis-cli", $redis-server, $redis-server).split: /\s+/;
+#       @redis-clis.push: @cmd-string;
+#   }
+#   for @redis-clis -> @redis-cli {
+#       my @rcmd        = flat @redis-cli,
+#                       '--raw',
+#                       'KEYS',
+#                       $isp-server-REDIS-keys-base ~ ':*';
+#       my $proc        = run   @rcmd, :out, :err;
+#       my $out         = $proc.out.slurp(:close);
+#       my $err         = $proc.err.slurp(:close);
+#       fail 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
+#       if $out {
+#           my @ispssks = $out.chomp.split("\n");
+#           die "No ISP server site keys!" unless @ispssks;
+#           @rcmd   = flat @redis-cli,
+#                   '--raw',
+#                   'SUNION',
+#                   @ispssks.join: ' ';
+#           $proc    = run   @rcmd, :out, :err;
+#           $out     = $proc.out.slurp(:close);
+#           $err     = $proc.err.slurp(:close);
+#           die 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
+#           if $out {
+#               %!isp-servers = $out.chomp.split("\n").map: { $_.uc => {} };
+#               die "Set up '/opt/tivoli/tsm/client/ba/bin/dsm.sys' & install '/usr/bin/dsmadmc' on this host." unless '/opt/tivoli/tsm/client/ba/bin/dsm.sys'.IO.path:s;
+#               my @dsm-sys     = slurp('/opt/tivoli/tsm/client/ba/bin/dsm.sys').lines;
+#               my $current-server;
+#               my $current-client;
+#               for @dsm-sys -> $rcd {
+#                   if $rcd ~~ m:i/ ^ SERVERNAME \s+ $<client>=(<alnum>+?) '_' $<server>=(<alnum>+) \s* $ / {           # %%% make this accept client names with '_'; take all but not the last '_'
+#                       $current-server = $/<server>.Str;
+#                       $current-client = $/<client>.Str;
+#                       %!isp-servers{$current-server}{$current-client} = ISP-SERVER-INFO.new(:SERVERNAME($current-client ~ '_' ~ $current-server));
+#                   }
+#                   elsif $rcd ~~ m:i/ ^ \s* TCPS\w* \s+ $<value>=(.+) \s* $/ {
+#                       %!isp-servers{$current-server}{$current-client}.TCPSERVERADDRESS = $/<value>.Str;
+#                   }
+#               }
+#               return self;
+#           }
+#       }
+#   }
+#   unless %!isp-servers.elems {
+#       $*ERR.put: colored('No ISP Servers defined in Redis under ' ~ $isp-server-REDIS-keys-base ~ ' keys!', 'red');
+#       die colored('Either fix your --$isp-server=<value> or update Redis ' ~ $isp-server-REDIS-keys-base ~ ':*', 'red');
+#   }
+
 my $user-id         =   'WMATA\tsmadmin';
 my $user-id-sterile = $user-id.subst('\\', '_');
 
