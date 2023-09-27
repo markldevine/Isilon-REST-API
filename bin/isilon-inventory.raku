@@ -100,9 +100,9 @@ sub MAIN (
 
     my ISP::dsmadmc $dsmadmc   .= new(:$isp-server, :$isp-admin);
 
-    my %isp-nodes;
-    my %isilon-paths;
     if $nfs {
+        my %isp-nodes;
+        my %isilon-paths;
         for $dsmadmc.execute(['SELECT', 'NODE_NAME', 'FROM', 'NODES', 'WHERE', 'NODEGROUP', 'LIKE', "'%NFS%'"]) -> $node-record {
             %isp-nodes{$node-record<NODE_NAME>} = '?';
         }
@@ -135,7 +135,7 @@ sub MAIN (
              @no-rest-presence.push: $node if $value eq '?';
         }
         if @no-rest-presence {
-            put "The following registered IP node(s) were not listed in the REST responses:\n";
+            put "The following registered ISP NFS node(s) were not listed in the REST responses:\n";
             .put for @no-rest-presence;
         }
         my @no-node-registered;
@@ -144,28 +144,50 @@ sub MAIN (
         }
         if @no-node-registered {
             put '' if @no-rest-presence.elems;
-            put "The following exports(s) do not have a registered ISP node:\n";
+            put "The following NFS exports(s) do not have a registered ISP node:\n";
             .put for @no-node-registered;
         }
     }
     elsif $smb {
+        my %isp-nodes;
+        my %isilon-shares;
         for $dsmadmc.execute(['SELECT', 'NODE_NAME', 'FROM', 'NODES', 'WHERE', 'NODEGROUP', 'LIKE', "'%SMB%'"]) -> $node-record {
-            put $node-record<NODE_NAME>;
+            %isp-nodes{$node-record<NODE_NAME>} = '?';
         }
         for @smb-authorities -> $authority {
             $stash-path = $*HOME ~ '/.' ~ $*PROGRAM-NAME.IO.basename ~ '/servers/' ~ $authority ~ '/' ~ $user-id-sterile ~ '.khph';
             $rest-client    = Isilon-Rest-Client.new(:url('https://' ~ $authority ~ '/platform/1/protocols/smb/shares'), :$user-id, :insecure, :$stash-path,);
             my $body        = $rest-client.get;
             for $body<shares>.list -> $share {
-                printf "%-30s%s\n", $share<name>, $share<path>;
+                %isilon-shares{$share<name>} = '?';
+                my $prefix  = 'SMB_';
+                if %isp-nodes{$prefix ~ $share<name>.uc}:exists {
+                    %isp-nodes{$prefix ~ $share<name>.uc}   = $share<path>;
+                    %isilon-shares{$share<name>.uc}         = $prefix ~ $share<name>.uc;
+                }
             }
+        }
+        my @no-rest-presence;
+        for %isp-nodes.kv -> $node, $value {
+             @no-rest-presence.push: $node if $value eq '?';
+        }
+        if @no-rest-presence {
+            put "The following registered ISP SMB node(s) were not listed in the REST responses:\n";
+            .put for @no-rest-presence;
+        }
+        my @no-node-registered;
+        for %isilon-shares.kv -> $share, $value {
+             @no-node-registered.push: $share if $value eq '?';
+        }
+        if @no-node-registered {
+            put '' if @no-rest-presence.elems;
+            put "The following SMB share(s) do not have a registered ISP node:\n";
+            .put for @no-node-registered;
         }
     }
     else {
         die $*USAGE;
     }
-#ddt %isp-nodes;
-#ddt %isilon-paths;
 }
 
 =finish
