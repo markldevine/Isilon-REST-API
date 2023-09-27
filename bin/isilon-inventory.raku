@@ -198,3 +198,27 @@ curl https://jgctsmb.wmataisln.local:8080/platform/1/protocols/smb/shares --inse
 curl https://jgctsmb.wmataisln.local:8080/platform/1/protocols/nfs/exports --insecure --basic --user wmata\\tsmadmin:${PASSWD}
 curl https://vdismb.wmataisln.local:8080/platform/1/protocols/smb/shares --insecure --basic --user wmata\\tsmadmin:${PASSWD}
 #curl https://vdismb.wmataisln.local:8080/platform/1/protocols/nfs/exports --insecure --basic --user wmata\\tsmadmin:${PASSWD}
+
+
+#!/usr/bin/bash
+
+cd /var/ansible/code/redis
+
+### Sets
+for FGSTLCSETKEY in `/usr/bin/redis-cli --raw keys fg:st:lc:*`
+do
+    /usr/bin/redis-cli DEL $FGSTLCSETKEY
+done
+/usr/bin/awk -F, '$1 ~ /^\w/ {print "SADD", "fg:st:lc:"$1, $2}' ./SOURCE/fg-st-lc.csv | /usr/bin/redis-cli --pipe
+/usr/bin/redis-cli SUNIONSTORE fg:st:lc:all fg:st:lc:dev fg:st:lc:tst fg:st:lc:qa fg:st:lc:prd
+
+### Strings
+for FGSTLCSTRINGKEY in `/usr/bin/redis-cli --raw keys fg-st-lc*`
+do
+    /usr/bin/redis-cli DEL $FGSTLCSTRINGKEY
+done
+/usr/bin/redis-cli SET fg-st-lc-dev "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:dev | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
+/usr/bin/redis-cli SET fg-st-lc-qa  "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:qa  | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
+/usr/bin/redis-cli SET fg-st-lc-tst "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:tst | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
+/usr/bin/redis-cli SET fg-st-lc-prd "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:prd | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
+/usr/bin/redis-cli SET fg-st-lc-all "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:all | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
