@@ -1,6 +1,6 @@
 #!/usr/bin/env raku
 
-use lib '/home/mdevine/github.com/raku-REST-Client-Role/lib';
+#use lib '/home/mdevine/github.com/raku-REST-Client-Role/lib';
 use ISP::dsmadmc;
 use REST::Client;
 
@@ -75,7 +75,7 @@ my $user-id         =   'WMATA\tsmadmin';
 my $user-id-sterile = $user-id.subst('\\', '_');
 
 my @nfs-authorities =   'jgctnfs.wmataisln.local:8080',
-                        'jgctapps.wmataisln.local:8080',
+#                       'jgctapps.wmataisln.local:8080',
                         'jgdciisln01nfs.wmataisln.local:8080',
                         'ctdciisln01nfs.wmataisln.local:8080';
 
