@@ -1,16 +1,18 @@
 #!/usr/bin/env raku
 
-#use lib '/home/mdevine/github.com/raku-REST-Client-Role/lib';
 use ISP::dsmadmc;
 use REST::Client;
 
 use Data::Dump::Tree;
 
-#   KEYS
-#   ----
-#   eb:isilon:nfs:authorities
-#   eb:isilon:smb:authorities
-#   eb:isilon:service-account
+constant    $redis-service-account-key  = 'eb:isilon:service-account';
+constant    $redis-nfs-authorities-key  = 'eb:isilon:nfs:authorities';
+constant    $redis-smb-authorities-key  = 'eb:isilon:smb:authorities';
+
+my $user-id;
+my $user-id-sterile;
+my @nfs-authorities;
+my @smb-authorities;
 
 sub get-config {
     my @redis-servers;
@@ -25,63 +27,58 @@ sub get-config {
         my @cmd-string = sprintf("ssh -L 127.0.0.1:6379:%s:6379 %s /usr/bin/redis-cli", $redis-server, $redis-server).split: /\s+/;
         @redis-clis.push: @cmd-string;
     }
-#   for @redis-clis -> @redis-cli {
-#       my @rcmd        = flat @redis-cli,
-#                       '--raw',
-#                       'KEYS',
-#                       $isp-server-REDIS-keys-base ~ ':*';
-#       my $proc        = run   @rcmd, :out, :err;
-#       my $out         = $proc.out.slurp(:close);
-#       my $err         = $proc.err.slurp(:close);
-#       fail 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
-#       if $out {
-#           my @ispssks = $out.chomp.split("\n");
-#           die "No ISP server site keys!" unless @ispssks;
-#           @rcmd   = flat @redis-cli,
-#                   '--raw',
-#                   'SUNION',
-#                   @ispssks.join: ' ';
-#           $proc    = run   @rcmd, :out, :err;
-#           $out     = $proc.out.slurp(:close);
-#           $err     = $proc.err.slurp(:close);
-#           die 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
-#           if $out {
-#               %!isp-servers = $out.chomp.split("\n").map: { $_.uc => {} };
-#               die "Set up '/opt/tivoli/tsm/client/ba/bin/dsm.sys' & install '/usr/bin/dsmadmc' on this host." unless '/opt/tivoli/tsm/client/ba/bin/dsm.sys'.IO.path:s;
-#               my @dsm-sys     = slurp('/opt/tivoli/tsm/client/ba/bin/dsm.sys').lines;
-#               my $current-server;
-#               my $current-client;
-#               for @dsm-sys -> $rcd {
-#                   if $rcd ~~ m:i/ ^ SERVERNAME \s+ $<client>=(<alnum>+?) '_' $<server>=(<alnum>+) \s* $ / {           # %%% make this accept client names with '_'; take all but not the last '_'
-#                       $current-server = $/<server>.Str;
-#                       $current-client = $/<client>.Str;
-#                       %!isp-servers{$current-server}{$current-client} = ISP-SERVER-INFO.new(:SERVERNAME($current-client ~ '_' ~ $current-server));
-#                   }
-#                   elsif $rcd ~~ m:i/ ^ \s* TCPS\w* \s+ $<value>=(.+) \s* $/ {
-#                       %!isp-servers{$current-server}{$current-client}.TCPSERVERADDRESS = $/<value>.Str;
-#                   }
-#               }
-#               return self;
-#           }
-#       }
-#   }
-#   unless %!isp-servers.elems {
-#       $*ERR.put: colored('No ISP Servers defined in Redis under ' ~ $isp-server-REDIS-keys-base ~ ' keys!', 'red');
-#       die colored('Either fix your --$isp-server=<value> or update Redis ' ~ $isp-server-REDIS-keys-base ~ ':*', 'red');
-#   }
+    for @redis-clis -> @redis-cli {
+        my @rcmd                = flat @redis-cli,
+                                '--raw',
+                                'GET',
+                                $redis-service-account-key;
+        my $proc                = run   @rcmd, :out, :err;
+        my $out                 = $proc.out.slurp(:close);
+        my $err                 = $proc.err.slurp(:close);
+        die 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
+        if $out {
+            $user-id            = $out.chomp;
+            $user-id-sterile    = $user-id.subst('\\', '_');
+        }
+        else {
+            die $err;
+        }
+    }
+    for @redis-clis -> @redis-cli {
+        my @rcmd                = flat @redis-cli,
+                                '--raw',
+                                'SMEMBERS',
+                                $redis-nfs-authorities-key;
+        my $proc                = run   @rcmd, :out, :err;
+        my $out                 = $proc.out.slurp(:close);
+        my $err                 = $proc.err.slurp(:close);
+        die 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
+        if $out {
+            @nfs-authorities    = $out.chomp.split(/\s+/);
+            last if @nfs-authorities.elems;
+        }
+        else {
+            die $err;
+        }
+    }
+    for @redis-clis -> @redis-cli {
+        my @rcmd                = flat @redis-cli,
+                                '--raw',
+                                'SMEMBERS',
+                                $redis-smb-authorities-key;
+        my $proc                = run   @rcmd, :out, :err;
+        my $out                 = $proc.out.slurp(:close);
+        my $err                 = $proc.err.slurp(:close);
+        die 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
+        if $out {
+            @smb-authorities    = $out.chomp.split(/\s+/);
+            last if @smb-authorities.elems;
+        }
+        else {
+            die $err;
+        }
+    }
 }
-
-my $user-id         =   'WMATA\tsmadmin';
-my $user-id-sterile = $user-id.subst('\\', '_');
-
-my @nfs-authorities =   'jgctnfs.wmataisln.local:8080',
-                        'jgdciisln01nfs.wmataisln.local:8080',
-                        'ctdciisln01nfs.wmataisln.local:8080';
-
-my @smb-authorities =   'jgctsmb.wmataisln.local:8080',
-                        'jgdciisln01nfs.wmataisln.local:8080',
-                        'ctdciisln01nfs.wmataisln.local:8080',
-                        'vdismb.wmataisln.local:8080';
 
 class Isilon-Rest-Client does REST::Client {}
 
@@ -190,33 +187,3 @@ sub MAIN (
 
 =finish
 
-curl https://jgctnfs.wmataisln.local:8080/platform/1/protocols/smb/shares --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-curl https://jgctnfs.wmataisln.local:8080/platform/1/protocols/nfs/exports --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-curl https://jgctsmb.wmataisln.local:8080/platform/1/protocols/smb/shares --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-curl https://jgctsmb.wmataisln.local:8080/platform/1/protocols/nfs/exports --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-curl https://vdismb.wmataisln.local:8080/platform/1/protocols/smb/shares --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-#curl https://vdismb.wmataisln.local:8080/platform/1/protocols/nfs/exports --insecure --basic --user wmata\\tsmadmin:${PASSWD}
-
-
-#!/usr/bin/bash
-
-cd /var/ansible/code/redis
-
-### Sets
-for FGSTLCSETKEY in `/usr/bin/redis-cli --raw keys fg:st:lc:*`
-do
-    /usr/bin/redis-cli DEL $FGSTLCSETKEY
-done
-/usr/bin/awk -F, '$1 ~ /^\w/ {print "SADD", "fg:st:lc:"$1, $2}' ./SOURCE/fg-st-lc.csv | /usr/bin/redis-cli --pipe
-/usr/bin/redis-cli SUNIONSTORE fg:st:lc:all fg:st:lc:dev fg:st:lc:tst fg:st:lc:qa fg:st:lc:prd
-
-### Strings
-for FGSTLCSTRINGKEY in `/usr/bin/redis-cli --raw keys fg-st-lc*`
-do
-    /usr/bin/redis-cli DEL $FGSTLCSTRINGKEY
-done
-/usr/bin/redis-cli SET fg-st-lc-dev "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:dev | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
-/usr/bin/redis-cli SET fg-st-lc-qa  "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:qa  | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
-/usr/bin/redis-cli SET fg-st-lc-tst "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:tst | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
-/usr/bin/redis-cli SET fg-st-lc-prd "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:prd | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
-/usr/bin/redis-cli SET fg-st-lc-all "`/usr/bin/redis-cli --raw SMEMBERS fg:st:lc:all | /usr/bin/sort -f | tr [:lower:] [:upper:]`"
