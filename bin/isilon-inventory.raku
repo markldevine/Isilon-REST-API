@@ -39,11 +39,13 @@ sub get-config {
         if $out {
             $user-id            = $out.chomp;
             $user-id-sterile    = $user-id.subst('\\', '_');
+            last;
         }
-        else {
+        elsif $err {
             die $err;
         }
     }
+    die 'Unable to obtain \$user-id from Redis' unless $user-id;
     for @redis-clis -> @redis-cli {
         my @rcmd                = flat @redis-cli,
                                 '--raw',
@@ -61,6 +63,7 @@ sub get-config {
             die $err;
         }
     }
+    die "Unable to obtain Isilon's NFS authorities from Redis" unless @nfs-authorities.elems;
     for @redis-clis -> @redis-cli {
         my @rcmd                = flat @redis-cli,
                                 '--raw',
@@ -74,10 +77,11 @@ sub get-config {
             @smb-authorities    = $out.chomp.split(/\s+/);
             last if @smb-authorities.elems;
         }
-        else {
+        elsif $err {
             die $err;
         }
     }
+    die "Unable to obtain Isilon's SMB authorities from Redis" unless @smb-authorities.elems;
 }
 
 class Isilon-Rest-Client does REST::Client {}
